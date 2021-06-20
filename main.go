@@ -5,7 +5,7 @@ import (
 	customMiddleware "batch-logger/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 )
 
@@ -17,6 +17,7 @@ func main() {
 	// Use Custom Middleware for request logging
 	r.Use(middleware.RequestID)
 	r.Use(customMiddleware.RequestLogger)
+
 	r.Use(middleware.Recoverer)
 
 	// Route Endpoints
@@ -24,7 +25,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("OK"))
 		if err != nil {
-			log.Printf("Response failed with error: %s", err)
+			log.Errorf("Response failed with error: %s", err)
 			return
 		}
 	})
@@ -38,6 +39,6 @@ func main() {
 	})
 
 	// Start the server
-	log.Printf("Starting server on port: %d", 3000)
+	log.Infof("Starting server on port: %d", 3000)
 	log.Fatal(http.ListenAndServe(":3000", r))
 }

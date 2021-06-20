@@ -5,6 +5,7 @@ import (
 	"batch-logger/pkg/utils"
 	"context"
 	"encoding/json"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 )
 
@@ -16,6 +17,7 @@ func AddLogToCtx(next http.Handler) http.Handler {
 		err := json.NewDecoder(r.Body).Decode(&l)
 
 		if err != nil {
+			log.Error("JSON could not be deserialized")
 			http.Error(w, "JSON could not be deserialized", 400)
 			return
 		}

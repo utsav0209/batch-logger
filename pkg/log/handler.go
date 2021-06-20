@@ -2,7 +2,7 @@ package log
 
 import (
 	"batch-logger/pkg/utils"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 )
@@ -42,7 +42,7 @@ func (h Handler) HandleLogRequest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	_, err := w.Write([]byte("Successfully Logged"))
 	if err != nil {
-		log.Printf("Response failed with error: %s", err)
+		log.Infof("Response failed with error: %s", err)
 		return
 	}
 }
