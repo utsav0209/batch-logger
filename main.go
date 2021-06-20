@@ -38,6 +38,8 @@ func main() {
 		r.Post("/", h.HandleLogRequest)
 	})
 
+	go h.SyncAtIntervals()
+
 	// Start the server
 	log.Infof("Starting server on port: %d", 3000)
 	log.Fatal(http.ListenAndServe(":3000", r))
