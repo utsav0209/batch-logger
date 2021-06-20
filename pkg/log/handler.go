@@ -4,6 +4,7 @@ import (
 	"batch-logger/pkg/utils"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
@@ -33,11 +34,11 @@ type Handler struct {
 	payloads       []Log
 }
 
-func CreateHandler() Handler {
+func CreateHandler(batchSize, batchInterval int, targetEndpoint string) Handler {
 	return Handler{
-		BatchSize:      3,
-		BatchInterval:  5,
-		TargetEndpoint: "localhost:9090",
+		BatchSize:      batchSize,
+		BatchInterval:  batchInterval,
+		TargetEndpoint: targetEndpoint,
 	}
 }
 
@@ -51,6 +52,16 @@ func (h *Handler) AddPayload(payload Log) []Log {
 	}
 
 	return h.payloads
+}
+
+// SyncAtIntervals Sync Payload Data in intervals to the provided endpoint
+func (h *Handler) SyncAtIntervals() {
+	for range time.Tick(time.Second * time.Duration(h.BatchInterval)) {
+		if len(h.payloads) > 0 {
+			// Call sync payloads concurrently
+			go h.syncPayloadsToPostEndpoint()
+		}
+	}
 }
 
 func (h *Handler) HandleLogRequest(w http.ResponseWriter, r *http.Request) {
@@ -68,22 +79,12 @@ func (h *Handler) HandleLogRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// SyncAtIntervals Sync Payload Data in intervals to the provided endpoint
-func (h *Handler) SyncAtIntervals() {
-	for range time.Tick(time.Second * time.Duration(h.BatchInterval)) {
-		if len(h.payloads) > 0 {
-			// Call sync payloads concurrently
-			go h.syncPayloadsToPostEndpoint()
-		}
-	}
-}
-
 func (h *Handler) syncPayloadsToPostEndpoint() {
 	log.Info("Syncing logs to POST Endpoint")
 
-	payloadsLength := len(h.payloads) // Number of elements in slice
-
+	payloadsLength := len(h.payloads)                           // Number of elements in slice
 	postBody, err := json.Marshal(h.payloads[0:payloadsLength]) // Prepare data for request
+	h.payloads = h.payloads[payloadsLength:]                    // remove elements
 	if err != nil {
 		// Exit the application if JSON can not be serialized
 		panic("JSON could not be marshalled")
@@ -92,24 +93,21 @@ func (h *Handler) syncPayloadsToPostEndpoint() {
 	start := time.Now()
 
 	for count := 0; count < 3; count++ {
-		res, err := http.Post("http://0.0.0.0:9090/test", "application/json", bytes.NewBuffer(postBody))
+		res, err := http.Post(h.TargetEndpoint, "application/json", bytes.NewBuffer(postBody))
 
 		// If err is nil then request was successful
 		if err == nil {
-			log.Infof("Synced Batch of Size %d with status code %d which took %s", len(h.payloads), res.StatusCode, time.Since(start))
+			log.Infof("Synced Batch of Size %d which returned status code %d and took %s", payloadsLength, res.StatusCode, time.Since(start))
 			break
 		}
 
 		// If syncing failed for 3 times in a row exit the application
 		if count == 2 {
-			log.Errorf("Log syncing failed with error: %s", err)
-			panic("Syncing to post endpoint is not working")
+			panic(fmt.Sprintf("Log syncing failed with error: %s", err))
 		}
 
 		// Wait for 2 seconds before retrying
 		time.Sleep(time.Second * time.Duration(2))
 	}
-
-	h.payloads = h.payloads[payloadsLength:] // remove elements
 
 }

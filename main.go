@@ -3,10 +3,17 @@ package main
 import (
 	logHandler "batch-logger/pkg/log"
 	customMiddleware "batch-logger/pkg/middleware"
+	"batch-logger/pkg/utils"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+)
+
+var (
+	batchSize      = utils.GetEnvAsInt("BATCH_SIZE")
+	batchInterval  = utils.GetEnvAsInt("BATCH_INTERVAL")
+	targetEndpoint = utils.GetEnvAsString("POST_ENDPOINT")
 )
 
 func main() {
@@ -17,7 +24,6 @@ func main() {
 	// Use Custom Middleware for request logging
 	r.Use(middleware.RequestID)
 	r.Use(customMiddleware.RequestLogger)
-
 	r.Use(middleware.Recoverer)
 
 	// Route Endpoints
@@ -31,7 +37,7 @@ func main() {
 	})
 
 	// Create Log Handler
-	h := logHandler.CreateHandler()
+	h := logHandler.CreateHandler(batchSize, batchInterval, targetEndpoint)
 
 	r.Route("/log", func(r chi.Router) {
 		r.Use(customMiddleware.AddLogToCtx)
