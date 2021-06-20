@@ -44,7 +44,10 @@ func main() {
 		r.Post("/", h.HandleLogRequest)
 	})
 
-	go h.SyncAtIntervals()
+	go h.CollectLogs()
+
+	// TODO: This does not work with current concurrency logic
+	//go h.SyncAtIntervals()
 
 	// Start the server
 	log.Infof("Starting server on port: %d", 3000)
