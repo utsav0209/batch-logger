@@ -8,49 +8,55 @@ import (
 )
 
 type Handler struct {
-	BatchInterval  int    // Interval in seconds at which syncing should happen
-	TargetEndpoint string // Target endpoint where JSON arrays should we eventually written
+	batchInterval  int    // Interval in seconds at which syncing should happen
+	targetEndpoint string // Target endpoint where JSON arrays should we eventually written
 	payloads       Payloads
 }
 
 func CreateHandler(batchSize, batchInterval int, targetEndpoint string) Handler {
 	return Handler{
-		BatchInterval:  batchInterval,
-		TargetEndpoint: targetEndpoint,
+		batchInterval:  batchInterval,
+		targetEndpoint: targetEndpoint,
 		payloads: Payloads{
-			BatchSize: batchSize,
+			batchSize: batchSize,
 			logs:      make(chan Log),
+			forceSync: make(chan string),
 		},
 	}
 }
 
 func (h *Handler) SyncAtIntervals() {
 	// Sync Payload Data in intervals to the provided endpoint
-	for range time.Tick(time.Second * time.Duration(h.BatchInterval)) {
-		if len(h.payloads.logs) > 0 {
-			// Concurrently call to sync data to post endpoint
-			go syncPayloadsToTargetEndpoint(nil, h.TargetEndpoint)
-		}
+	for range time.Tick(time.Second * time.Duration(h.batchInterval)) {
+		h.payloads.sync()
 	}
 }
 
 func (h *Handler) CollectLogs() {
-	// Collect logs from Handler's payload channel and sync when data is full
-	payloads := make([]Log, 0, h.payloads.BatchSize)
-	for {
-		payload := <-h.payloads.logs
-		payloads = append(payloads, payload)
+	// Collect logs from Handler's payload channel and forceSync channel to sync data concurrently
+	payloads := make([]Log, 0, h.payloads.batchSize)
 
-		if len(payloads) >= h.payloads.BatchSize {
-			// Concurrently call to sync data to post endpoint
-			go syncPayloadsToTargetEndpoint(payloads, h.TargetEndpoint)
-			payloads = make([]Log, 0, h.payloads.BatchSize)
+	for {
+		select {
+		case p := <-h.payloads.logs: // Collect logs from payload channel
+			payloads = append(payloads, p)
+			if len(payloads) >= h.payloads.batchSize {
+				// Concurrently call to sync data to post endpoint
+				go syncPayloadsToTargetEndpoint(payloads, h.targetEndpoint)
+				payloads = make([]Log, 0, h.payloads.batchSize)
+			}
+		case <-h.payloads.forceSync: // Forcefully sync on intervals
+			if len(payloads) > 0 {
+				// Concurrently call to sync data to post endpoint
+				go syncPayloadsToTargetEndpoint(payloads, h.targetEndpoint)
+				payloads = make([]Log, 0, h.payloads.batchSize)
+			}
 		}
 	}
 }
 
 func (h *Handler) HandleLogRequest(w http.ResponseWriter, r *http.Request) {
-	// Fetch Payload from context and store in memory
+	// Fetch Payload from context and stream it
 	ctx := r.Context()
 	payload := ctx.Value(utils.GetPayloadRequestId(ctx)).(Log)
 	h.payloads.Add(payload)
