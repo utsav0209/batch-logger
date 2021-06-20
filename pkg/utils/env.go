@@ -7,11 +7,11 @@ import (
 )
 
 func GetEnvAsInt(name string) int {
-
-	env, err := strconv.Atoi(GetEnvAsString(name))
+	val := GetEnvAsString(name)
+	env, err := strconv.Atoi(val)
 
 	if err != nil {
-		panic("Environment variable could not be parsed as int")
+		panic(fmt.Sprintf("Environment variable %s with value %s could not be parsed as int", name, val))
 	}
 
 	return env

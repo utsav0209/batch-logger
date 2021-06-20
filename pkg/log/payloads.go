@@ -20,10 +20,15 @@ type Log struct {
 }
 
 type Payloads struct {
-	BatchSize int // Maximum batch size
-	logs      chan Log
+	batchSize int         // Maximum batch size
+	logs      chan Log    // Channel to stream logs
+	forceSync chan string // Channel to sync logs on intervals
 }
 
 func (p Payloads) Add(log Log) {
 	p.logs <- log
+}
+
+func (p Payloads) sync() {
+	p.forceSync <- "sync"
 }

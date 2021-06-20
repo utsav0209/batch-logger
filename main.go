@@ -46,8 +46,7 @@ func main() {
 
 	go h.CollectLogs()
 
-	// TODO: This does not work with current concurrency logic
-	//go h.SyncAtIntervals()
+	go h.SyncAtIntervals()
 
 	// Start the server
 	log.Infof("Starting server on port: %d", 3000)
